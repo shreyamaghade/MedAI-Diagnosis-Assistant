@@ -1,0 +1,5 @@
+{
+  "name": "MedAI Diagnosis Assistant",
+  "description": "An AI-powered preliminary diagnostic tool that predicts potential conditions based on symptoms to support patients and healthcare providers.",
+  "requestFramePermissions": []
+}
