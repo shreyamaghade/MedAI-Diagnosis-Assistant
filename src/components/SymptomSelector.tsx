@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, X, Plus, Mic, MicOff, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { motion, AnimatePresence } from 'motion/react';
 
 const COMMON_SYMPTOMS = [
   "Fever", "Cough", "Fatigue", "Headache", "Nausea", "Dizziness", 
@@ -96,34 +97,42 @@ export const SymptomSelector: React.FC<SymptomSelectorProps> = ({ selectedSympto
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {selectedSymptoms.map((symptom) => (
-          <span
-            key={symptom}
-            className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full text-sm font-medium animate-in fade-in zoom-in duration-200"
-          >
-            {symptom}
-            <button
-              onClick={() => removeSymptom(symptom)}
-              className="hover:text-emerald-900 transition-colors"
+        <AnimatePresence>
+          {selectedSymptoms.map((symptom) => (
+            <motion.span
+              layout
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              key={symptom}
+              className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full text-sm font-medium"
             >
-              <X className="h-3 w-3" />
-            </button>
-          </span>
-        ))}
+              {symptom}
+              <button
+                onClick={() => removeSymptom(symptom)}
+                className="hover:text-emerald-900 transition-colors"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </motion.span>
+          ))}
+        </AnimatePresence>
       </div>
 
       <div className="pt-2">
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Common Symptoms</p>
         <div className="flex flex-wrap gap-2">
           {COMMON_SYMPTOMS.filter(s => !selectedSymptoms.includes(s)).map((symptom) => (
-            <button
+            <motion.button
+              whileHover={{ scale: 1.05, backgroundColor: '#ecfdf5', borderColor: '#10b981', color: '#059669' }}
+              whileTap={{ scale: 0.95 }}
               key={symptom}
               onClick={() => addSymptom(symptom)}
-              className="px-3 py-1 bg-white border border-slate-200 rounded-full text-sm text-slate-600 hover:border-emerald-500 hover:text-emerald-600 transition-all flex items-center gap-1"
+              className="px-3 py-1 bg-white border border-slate-200 rounded-full text-sm text-slate-600 transition-all flex items-center gap-1"
             >
               <Plus className="h-3 w-3" />
               {symptom}
-            </button>
+            </motion.button>
           ))}
         </div>
       </div>

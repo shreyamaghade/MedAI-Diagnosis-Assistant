@@ -30,6 +30,8 @@ import { DashboardView } from './components/DashboardView';
 import { HealthSync } from './components/HealthSync';
 import { TriageDashboard } from './components/TriageDashboard';
 import { SpecialistFinder } from './components/SpecialistFinder';
+import { TelehealthSession } from './components/TelehealthSession';
+import { ProfileView } from './components/ProfileView';
 import { getFollowUpQuestions, getFinalDiagnosis, getConditionDeepDive, generateSpeech, findSpecialists, DiagnosisResponse, FileData, Vitals, ChatMessage, ConditionDeepDive } from './services/geminiService';
 import { login, saveDiagnosis, User } from './services/apiService';
 import { HealthData } from './services/healthService';
@@ -40,7 +42,7 @@ import Markdown from 'react-markdown';
 import { cn } from './lib/utils';
 
 type AppStep = 'input' | 'chat' | 'result';
-type Tab = 'diagnosis' | 'history' | 'dashboard' | 'triage';
+type Tab = 'diagnosis' | 'history' | 'dashboard' | 'triage' | 'profile';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -72,10 +74,17 @@ export default function App() {
   const [isReading, setIsReading] = useState(false);
   const [isSpecialistFinderOpen, setIsSpecialistFinderOpen] = useState(false);
   const [targetSpecialist, setTargetSpecialist] = useState('');
+  const [isTelehealthOpen, setIsTelehealthOpen] = useState(false);
+  const [telehealthCondition, setTelehealthCondition] = useState('');
 
   const handleFindSpecialist = (specialistType: string) => {
     setTargetSpecialist(specialistType);
     setIsSpecialistFinderOpen(true);
+  };
+
+  const handleTelehealth = (condition: string) => {
+    setTelehealthCondition(condition);
+    setIsTelehealthOpen(true);
   };
 
   const handleReadReport = async () => {
@@ -198,6 +207,14 @@ export default function App() {
     setCurrentDiagnosisId(null);
   };
 
+  const handleLogout = () => {
+    setUser(null);
+    setActiveTab('diagnosis');
+    setStep('input');
+    setSymptoms([]);
+    setResult(null);
+  };
+
   const t = UI_STRINGS[language];
   const isRtl = SUPPORTED_LANGUAGES.find(l => l.code === language)?.dir === 'rtl';
 
@@ -212,32 +229,45 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
       {/* Navigation */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
+      <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/50 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => { setActiveTab('diagnosis'); reset(); }}>
+          <motion.div 
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="flex items-center gap-3 cursor-pointer" 
+            onClick={() => { setActiveTab('diagnosis'); reset(); }}
+          >
             <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-100">
               <HeartPulse className="text-white h-6 w-6" />
             </div>
             <span className="text-xl font-black tracking-tight text-slate-900">MedAI</span>
-          </div>
+          </motion.div>
 
-          <nav className="hidden md:flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-100">
+          <nav className="hidden md:flex items-center gap-1 bg-slate-100/50 p-1 rounded-xl border border-slate-200/50 relative">
             {[
               { id: 'diagnosis', label: t.diagnosis, icon: Stethoscope },
               { id: 'history', label: t.history, icon: Clock },
               { id: 'dashboard', label: t.dashboard, icon: Activity },
               { id: 'triage', label: t.triage, icon: AlertTriangle },
+              { id: 'profile', label: 'Profile', icon: UserIcon },
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as Tab)}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all",
+                  "relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all z-10",
                   activeTab === tab.id 
-                    ? "bg-white text-emerald-600 shadow-sm" 
-                    : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                    ? "text-emerald-600" 
+                    : "text-slate-500 hover:text-slate-900"
                 )}
               >
+                {activeTab === tab.id && (
+                  <motion.div
+                    layoutId="activeTab"
+                    className="absolute inset-0 bg-white shadow-sm rounded-lg -z-10"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
                 <tab.icon className="h-4 w-4" />
                 {tab.label}
               </button>
@@ -259,7 +289,7 @@ export default function App() {
             </div>
             <div className="hidden sm:flex flex-col items-end">
               <span className="text-xs font-bold text-slate-900">{user.name || user.email}</span>
-              <button onClick={() => setUser(null)} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-red-500 transition-colors">{t.signOut}</button>
+              <button onClick={handleLogout} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-red-500 transition-colors">{t.signOut}</button>
             </div>
             <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center border border-slate-200">
               <UserIcon className="h-5 w-5 text-slate-400" />
@@ -348,7 +378,9 @@ export default function App() {
                         </div>
 
                         <div className="pt-4">
-                          <button
+                          <motion.button
+                            whileHover={(symptoms.length > 0 || fileData || visualFileData || Object.keys(vitals).length > 0) ? { scale: 1.01 } : {}}
+                            whileTap={(symptoms.length > 0 || fileData || visualFileData || Object.keys(vitals).length > 0) ? { scale: 0.99 } : {}}
                             onClick={handleStartChat}
                             disabled={loading || (symptoms.length === 0 && !fileData && !visualFileData && Object.keys(vitals).length === 0)}
                             className={cn(
@@ -369,7 +401,7 @@ export default function App() {
                                 <ArrowRight className={cn("h-5 w-5", isRtl && "rotate-180")} />
                               </>
                             )}
-                          </button>
+                          </motion.button>
                         </div>
                       </div>
                       
@@ -439,13 +471,15 @@ export default function App() {
                             onKeyDown={(e) => e.key === 'Enter' && handleAnswerQuestion()}
                             disabled={loading}
                           />
-                          <button
+                          <motion.button
+                            whileHover={!loading && userAnswer.trim() ? { scale: 1.02 } : {}}
+                            whileTap={!loading && userAnswer.trim() ? { scale: 0.98 } : {}}
                             onClick={handleAnswerQuestion}
                             disabled={loading || !userAnswer.trim()}
                             className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 transition-all shadow-md shadow-emerald-100"
                           >
                             {t.send}
-                          </button>
+                          </motion.button>
                         </div>
                         <p className="text-[10px] text-slate-400 text-center mt-3 font-medium uppercase tracking-wider">
                           {t.question} {currentQuestionIndex + 1} {t.of} {questions.length}
@@ -468,7 +502,9 @@ export default function App() {
                         <p className="text-slate-500 font-medium">Based on your symptoms, vitals, and conversation history.</p>
                       </div>
                       <div className="flex items-center gap-3">
-                        <button 
+                        <motion.button 
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
                           onClick={handleReadReport}
                           disabled={isReading}
                           className={cn(
@@ -480,17 +516,21 @@ export default function App() {
                         >
                           <Volume2 className={cn("h-4 w-4", isReading && "animate-bounce")} />
                           {isReading ? "Reading..." : "Read Report"}
-                        </button>
+                        </motion.button>
                         {isDoctorView && (
-                          <button 
+                          <motion.button 
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
                             onClick={handleExportEHR}
                             className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-sm font-bold hover:bg-emerald-100 transition-all shadow-sm"
                           >
                             <Activity className="h-4 w-4" />
                             {t.exportEHR}
-                          </button>
+                          </motion.button>
                         )}
-                        <button 
+                        <motion.button 
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
                           onClick={() => setIsDoctorView(!isDoctorView)}
                           className={cn(
                             "px-4 py-2 rounded-xl text-sm font-bold transition-all border",
@@ -500,14 +540,16 @@ export default function App() {
                           )}
                         >
                           {isDoctorView ? t.switchPatient : t.switchDoctor}
-                        </button>
-                        <button 
+                        </motion.button>
+                        <motion.button 
+                          whileHover={{ scale: 1.1, rotate: 15 }}
+                          whileTap={{ scale: 0.9, rotate: -15 }}
                           onClick={reset}
                           className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all"
                           title={t.newAnalysis}
                         >
                           <RefreshCw className="h-5 w-5" />
-                        </button>
+                        </motion.button>
                       </div>
                     </div>
 
@@ -533,6 +575,7 @@ export default function App() {
                           isDoctorView={isDoctorView} 
                           onDeepDive={handleDeepDive}
                           onFindSpecialist={handleFindSpecialist}
+                          onTelehealth={handleTelehealth}
                           diagnosisId={currentDiagnosisId}
                           doctorId={user.id}
                         />
@@ -584,6 +627,17 @@ export default function App() {
               <TriageDashboard />
             </motion.div>
           )}
+
+          {activeTab === 'profile' && user && (
+            <motion.div
+              key="profile-tab"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <ProfileView user={user} onLogout={handleLogout} />
+            </motion.div>
+          )}
         </AnimatePresence>
 
         <DeepDiveModal
@@ -598,6 +652,13 @@ export default function App() {
           <SpecialistFinder 
             specialistType={targetSpecialist} 
             onClose={() => setIsSpecialistFinderOpen(false)} 
+          />
+        )}
+
+        {isTelehealthOpen && (
+          <TelehealthSession 
+            condition={telehealthCondition} 
+            onClose={() => setIsTelehealthOpen(false)} 
           />
         )}
 

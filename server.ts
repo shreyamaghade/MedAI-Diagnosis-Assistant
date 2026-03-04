@@ -3,6 +3,7 @@ import { createServer as createViteServer } from "vite";
 import Database from "better-sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
+import bcrypt from "bcryptjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,7 +15,8 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     email TEXT UNIQUE NOT NULL,
-    name TEXT
+    name TEXT,
+    password TEXT
   );
 
   CREATE TABLE IF NOT EXISTS diagnoses (
@@ -41,12 +43,22 @@ db.exec(`
   );
 `);
 
+// Migration: Add password column if it doesn't exist
+const userTableInfo = db.prepare("PRAGMA table_info(users)").all() as any[];
+const hasPassword = userTableInfo.some(column => column.name === 'password');
+if (!hasPassword) {
+  db.exec("ALTER TABLE users ADD COLUMN password TEXT");
+}
+
 // Migration: Add urgency column if it doesn't exist
-const tableInfo = db.prepare("PRAGMA table_info(diagnoses)").all() as any[];
-const hasUrgency = tableInfo.some(column => column.name === 'urgency');
+const diagnosesTableInfo = db.prepare("PRAGMA table_info(diagnoses)").all() as any[];
+const hasUrgency = diagnosesTableInfo.some(column => column.name === 'urgency');
 if (!hasUrgency) {
   db.exec("ALTER TABLE diagnoses ADD COLUMN urgency TEXT DEFAULT 'Routine'");
 }
+
+// Migration: Lowercase all existing emails for consistency
+db.exec("UPDATE users SET email = LOWER(TRIM(email))");
 
 async function startServer() {
   const app = express();
@@ -55,16 +67,47 @@ async function startServer() {
   app.use(express.json());
 
   // API Routes
-  app.post("/api/auth/login", (req, res) => {
-    const { email, name } = req.body;
-    if (!email) return res.status(400).json({ error: "Email is required" });
+  app.post("/api/auth/register", async (req, res) => {
+    const { email: rawEmail, name, password } = req.body;
+    if (!rawEmail || !password) return res.status(400).json({ error: "Email and password are required" });
 
-    let user = db.prepare("SELECT * FROM users WHERE email = ?").get(email) as any;
-    if (!user) {
-      const result = db.prepare("INSERT INTO users (email, name) VALUES (?, ?)").run(email, name || "");
-      user = { id: result.lastInsertRowid, email, name };
+    const email = rawEmail.trim().toLowerCase();
+    const existingUser = db.prepare("SELECT * FROM users WHERE email = ?").get(email) as any;
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    if (existingUser) {
+      if (existingUser.password) {
+        return res.status(400).json({ error: "Email already exists" });
+      } else {
+        // Legacy user without password, update it
+        db.prepare("UPDATE users SET name = ?, password = ? WHERE email = ?").run(name || existingUser.name || "", hashedPassword, email);
+        const user = { id: existingUser.id, email, name: name || existingUser.name };
+        return res.json(user);
+      }
     }
+
+    const result = db.prepare("INSERT INTO users (email, name, password) VALUES (?, ?, ?)").run(email, name || "", hashedPassword);
+    const user = { id: result.lastInsertRowid, email, name };
     res.json(user);
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    const { email: rawEmail, password } = req.body;
+    if (!rawEmail || !password) return res.status(400).json({ error: "Email and password are required" });
+
+    const email = rawEmail.trim().toLowerCase();
+    const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email) as any;
+    if (!user) return res.status(401).json({ error: "Invalid email or password" });
+
+    // If user exists but has no password (legacy user), allow login if no password provided (or handle migration)
+    // For this task, we assume all users should have a password now.
+    if (!user.password) return res.status(401).json({ error: "Account needs password setup. Please register again." });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(401).json({ error: "Invalid email or password" });
+
+    const { password: _, ...userWithoutPassword } = user;
+    res.json(userWithoutPassword);
   });
 
   app.get("/api/diagnoses", (req, res) => {

@@ -33,7 +33,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user }) => {
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+        <motion.div 
+          whileHover={{ y: -5, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)" }}
+          className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4"
+        >
           <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
             <Activity className="h-5 w-5 text-blue-600" />
           </div>
@@ -41,9 +44,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user }) => {
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Reports</p>
             <p className="text-3xl font-black text-slate-900">{records.length}</p>
           </div>
-        </div>
+        </motion.div>
         
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+        <motion.div 
+          whileHover={{ y: -5, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)" }}
+          className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4"
+        >
           <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
             <TrendingUp className="h-5 w-5 text-emerald-600" />
           </div>
@@ -51,9 +57,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user }) => {
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Top Symptom</p>
             <p className="text-3xl font-black text-slate-900">{topSymptoms[0]?.[0] || 'N/A'}</p>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
+        <motion.div 
+          whileHover={{ y: -5, boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)" }}
+          className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4"
+        >
           <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
             <AlertCircle className="h-5 w-5 text-amber-600" />
           </div>
@@ -63,7 +72,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user }) => {
               {records.length > 0 ? new Date(records[0].date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'N/A'}
             </p>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

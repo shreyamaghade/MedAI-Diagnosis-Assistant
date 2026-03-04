@@ -1,19 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, ChevronRight, Stethoscope, Clock, User, Activity, ExternalLink, CheckCircle2, XCircle, BarChart3, MapPin } from 'lucide-react';
+import { AlertCircle, ChevronRight, Stethoscope, Clock, User, Activity, ExternalLink, CheckCircle2, XCircle, BarChart3, MapPin, Video } from 'lucide-react';
 import { DiagnosisResult } from '../services/geminiService';
 import { verifyDiagnosis, getConfidenceStats } from '../services/apiService';
 import { cn } from '../lib/utils';
+import { motion } from 'motion/react';
 
 interface DiagnosisCardProps {
   result: DiagnosisResult;
   isDoctorView: boolean;
   onDeepDive: (condition: string) => void;
   onFindSpecialist: (specialistType: string) => void;
+  onTelehealth: (condition: string) => void;
   diagnosisId?: number | null;
   doctorId?: number;
 }
 
-export const DiagnosisCard: React.FC<DiagnosisCardProps> = ({ result, isDoctorView, onDeepDive, onFindSpecialist, diagnosisId, doctorId }) => {
+export const DiagnosisCard: React.FC<DiagnosisCardProps> = ({ result, isDoctorView, onDeepDive, onFindSpecialist, onTelehealth, diagnosisId, doctorId }) => {
   const [verified, setVerified] = useState<'Agree' | 'Correct' | null>(null);
   const [confidence, setConfidence] = useState<{ total: number; score: number } | null>(null);
 
@@ -123,13 +125,26 @@ export const DiagnosisCard: React.FC<DiagnosisCardProps> = ({ result, isDoctorVi
           ))}
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => onFindSpecialist(result.recommendedSpecialist)}
             className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-lg text-sm font-bold hover:bg-emerald-100 transition-all group shrink-0"
           >
-            <MapPin className="h-4 w-4" />
+            <motion.div whileHover={{ y: -2 }} transition={{ type: "spring", stiffness: 400, damping: 10 }}>
+              <MapPin className="h-4 w-4" />
+            </motion.div>
             Find Specialist
-          </button>
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => onTelehealth(result.condition)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-all group shrink-0 shadow-lg shadow-blue-600/20"
+          >
+            <Video className="h-4 w-4 animate-pulse" />
+            Consult Now
+          </motion.button>
           {isDoctorView && diagnosisId && (
             <div className="flex items-center gap-2 mr-2 pr-4 border-r border-slate-100">
               {verified ? (
@@ -142,31 +157,37 @@ export const DiagnosisCard: React.FC<DiagnosisCardProps> = ({ result, isDoctorVi
                 </span>
               ) : (
                 <>
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={() => handleVerify('Agree')}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all"
                   >
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     Agree
-                  </button>
-                  <button
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={() => handleVerify('Correct')}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-amber-50 hover:text-amber-600 hover:border-amber-200 transition-all"
                   >
                     <XCircle className="h-3.5 w-3.5" />
                     Correct
-                  </button>
+                  </motion.button>
                 </>
               )}
             </div>
           )}
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => onDeepDive(result.condition)}
             className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold hover:bg-emerald-600 hover:text-white transition-all group shrink-0"
           >
             Explore Deep-Dive
             <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-          </button>
+          </motion.button>
         </div>
       </div>
 

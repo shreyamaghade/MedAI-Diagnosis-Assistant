@@ -104,9 +104,13 @@ export const TriageDashboard: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button className="p-2 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-emerald-600 hover:border-emerald-200 transition-all shadow-sm">
+                      <motion.button 
+                        whileHover={{ scale: 1.1, backgroundColor: '#ecfdf5', borderColor: '#10b981', color: '#059669' }}
+                        whileTap={{ scale: 0.9 }}
+                        className="p-2 bg-white border border-slate-200 rounded-lg text-slate-400 transition-all shadow-sm"
+                      >
                         <ChevronRight className="h-4 w-4" />
-                      </button>
+                      </motion.button>
                     </td>
                   </motion.tr>
                 );

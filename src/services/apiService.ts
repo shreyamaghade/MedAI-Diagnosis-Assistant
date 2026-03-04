@@ -16,13 +16,29 @@ export interface DiagnosisRecord {
   patient_email?: string;
 }
 
-export async function login(email: string, name?: string): Promise<User> {
+export async function login(email: string, password: string): Promise<User> {
   const response = await fetch("/api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, name }),
+    body: JSON.stringify({ email, password }),
   });
-  if (!response.ok) throw new Error("Login failed");
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Login failed");
+  }
+  return response.json();
+}
+
+export async function register(email: string, password: string, name: string): Promise<User> {
+  const response = await fetch("/api/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, name }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Registration failed");
+  }
   return response.json();
 }
 

@@ -49,8 +49,10 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
                 key={record.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
+                whileHover={{ y: -2, boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)" }}
+                whileTap={{ scale: 0.995 }}
                 transition={{ delay: idx * 0.05 }}
-                className="bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-md transition-all group cursor-pointer"
+                className="bg-white border border-slate-200 rounded-2xl p-6 transition-all group cursor-pointer"
               >
                 <div className="flex justify-between items-start gap-4">
                   <div className="space-y-3 flex-1">

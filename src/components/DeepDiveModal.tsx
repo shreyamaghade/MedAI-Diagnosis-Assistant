@@ -27,12 +27,14 @@ export const DeepDiveModal: React.FC<DeepDiveModalProps> = ({ isOpen, onClose, c
                 <h2 className="text-2xl font-bold text-slate-900">{condition}</h2>
                 <p className="text-sm text-slate-500 font-medium">Detailed Condition Deep-Dive</p>
               </div>
-              <button
+              <motion.button
+                whileHover={{ scale: 1.1, rotate: 90 }}
+                whileTap={{ scale: 0.9 }}
                 onClick={onClose}
                 className="p-2 hover:bg-slate-100 rounded-full transition-colors"
               >
                 <X className="h-6 w-6 text-slate-400" />
-              </button>
+              </motion.button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-8 space-y-8">
