@@ -717,9 +717,47 @@ export default function App() {
         )}
 
         {error && (
-          <div className="mt-8 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-center font-medium">
-            {error}
-          </div>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-8 p-6 bg-red-50 border border-red-200 rounded-2xl shadow-sm space-y-4"
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center shrink-0">
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+              </div>
+              <div className="space-y-1 flex-1">
+                <h3 className="font-bold text-red-900">Analysis Interrupted</h3>
+                <p className="text-sm text-red-700/80 leading-relaxed font-medium">
+                  {error}
+                </p>
+              </div>
+              <button 
+                onClick={() => setError(null)}
+                className="text-red-400 hover:text-red-600 transition-colors"
+              >
+                <RefreshCcw className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex items-center gap-3 pt-2">
+              <button 
+                onClick={() => {
+                  setError(null);
+                  if (step === 'input') handleStartChat();
+                  else if (step === 'chat') handleAnswerQuestion();
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-bold hover:bg-red-700 transition-all shadow-md shadow-red-100"
+              >
+                Try Again
+              </button>
+              <button 
+                onClick={reset}
+                className="px-4 py-2 bg-white text-slate-600 border border-slate-200 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all"
+              >
+                Start Over
+              </button>
+            </div>
+          </motion.div>
         )}
       </main>
 
