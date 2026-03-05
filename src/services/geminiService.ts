@@ -1,8 +1,13 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
-
-import { HealthData } from "./healthService";
+function getAI() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === "undefined" || apiKey === "") {
+    console.error("GEMINI_API_KEY is missing or invalid on the frontend.");
+    throw new Error("Gemini API key is not configured.");
+  }
+  return new GoogleGenAI({ apiKey });
+}
 
 export interface DiagnosisResult {
   condition: string;
@@ -42,15 +47,25 @@ export interface ChatMessage {
   text: string;
 }
 
-export interface FollowUpQuestions {
-  questions: string[];
+export interface ConditionDeepDive {
+  treatments: string[];
+  lifestyleAdjustments: string[];
+  questionsForDoctor: string[];
+}
+
+export interface SpecialistLocation {
+  name: string;
+  address?: string;
+  phone?: string;
+  rating?: number;
+  url: string;
 }
 
 export async function getFollowUpQuestions(
   symptoms: string[], 
   files?: FileData[], 
   vitals?: Vitals,
-  healthData?: HealthData,
+  healthData?: any,
   language: string = 'en'
 ): Promise<string[]> {
   const vitalsString = vitals ? `
@@ -85,6 +100,7 @@ export async function getFollowUpQuestions(
     parts.push(...files);
   }
 
+  const ai = getAI();
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: { parts },
@@ -101,13 +117,7 @@ export async function getFollowUpQuestions(
   });
 
   const data = JSON.parse(response.text || '{"questions": []}');
-  return data.questions;
-}
-
-export interface ConditionDeepDive {
-  treatments: string[];
-  lifestyleAdjustments: string[];
-  questionsForDoctor: string[];
+  return data.questions || [];
 }
 
 export async function getConditionDeepDive(condition: string): Promise<ConditionDeepDive> {
@@ -119,6 +129,7 @@ export async function getConditionDeepDive(condition: string): Promise<Condition
   
   Return the response in JSON format.`;
 
+  const ai = getAI();
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: prompt,
@@ -144,7 +155,7 @@ export async function getFinalDiagnosis(
   chatHistory: ChatMessage[], 
   files?: FileData[], 
   vitals?: Vitals,
-  healthData?: HealthData,
+  healthData?: any,
   language: string = 'en'
 ): Promise<DiagnosisResponse> {
   const vitalsString = vitals ? `
@@ -162,7 +173,7 @@ export async function getFinalDiagnosis(
   - Average Daily Steps: ${healthData.avgSteps}
   ` : "";
 
-  const chatTranscript = chatHistory.map(m => `${m.role === "user" ? "Patient" : "Assistant"}: ${m.text}`).join("\n");
+  const chatTranscript = chatHistory.map((m: any) => `${m.role === "user" ? "Patient" : "Assistant"}: ${m.text}`).join("\n");
 
   const prompt = `As a medical diagnostic assistant, analyze the following comprehensive information to provide a list of possible conditions.
   
@@ -189,6 +200,7 @@ export async function getFinalDiagnosis(
     parts.push(...files);
   }
 
+  const ai = getAI();
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: { parts },
@@ -239,6 +251,7 @@ export async function getFinalDiagnosis(
 
 export async function generateSpeech(text: string): Promise<string | undefined> {
   try {
+    const ai = getAI();
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text: `Read this medical summary clearly: ${text}` }] }],
@@ -257,14 +270,6 @@ export async function generateSpeech(text: string): Promise<string | undefined> 
     console.error("TTS failed:", err);
     return undefined;
   }
-}
-
-export interface SpecialistLocation {
-  name: string;
-  address?: string;
-  phone?: string;
-  rating?: number;
-  url: string;
 }
 
 export async function findSpecialists(
@@ -289,13 +294,14 @@ export async function findSpecialists(
     };
   }
 
+  const ai = getAI();
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
     contents: prompt,
     config
   });
 
-  const locations: SpecialistLocation[] = [];
+  const locations: any[] = [];
   const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
   
   if (chunks) {

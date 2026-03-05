@@ -3,6 +3,7 @@ import { AlertTriangle, Clock, User, ChevronRight, Search, Filter } from 'lucide
 import { getTriageDashboard, DiagnosisRecord } from '../services/apiService';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
+import { Skeleton } from './Skeleton';
 
 export const TriageDashboard: React.FC = () => {
   const [records, setRecords] = useState<DiagnosisRecord[]>([]);
@@ -20,7 +21,38 @@ export const TriageDashboard: React.FC = () => {
     r.summary.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (loading) return <div className="py-12 text-center text-slate-500 font-medium">Loading triage data...</div>;
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-96" />
+          </div>
+          <Skeleton className="h-10 w-64 rounded-xl" />
+        </div>
+        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+          <div className="p-6 space-y-4">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="flex items-center gap-6 py-4 border-b border-slate-50 last:border-0">
+                <Skeleton className="h-6 w-20 rounded-full" />
+                <div className="flex items-center gap-3 flex-1">
+                  <Skeleton className="w-8 h-8 rounded-full" />
+                  <div className="space-y-1">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-40" />
+                  </div>
+                </div>
+                <Skeleton className="h-4 w-48" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="w-8 h-8 rounded-lg" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

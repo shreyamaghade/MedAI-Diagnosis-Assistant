@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Clock, ChevronRight, Calendar, Activity } from 'lucide-react';
+import { Clock, ChevronRight, Calendar, Activity, ArrowRight, ClipboardList } from 'lucide-react';
 import { getDiagnoses, DiagnosisRecord, User } from '../services/apiService';
 import { motion } from 'motion/react';
+import { Skeleton } from './Skeleton';
 
 interface HistoryViewProps {
   user: User;
+  onStartCheckup?: () => void;
 }
 
-export const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
+export const HistoryView: React.FC<HistoryViewProps> = ({ user, onStartCheckup }) => {
   const [records, setRecords] = useState<DiagnosisRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -17,7 +19,34 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
       .finally(() => setLoading(false));
   }, [user.id]);
 
-  if (loading) return <div className="py-12 text-center text-slate-500">Loading history...</div>;
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+        <div className="grid grid-cols-1 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
+              <div className="flex justify-between items-start">
+                <div className="space-y-3 flex-1">
+                  <Skeleton className="h-3 w-32" />
+                  <Skeleton className="h-6 w-3/4" />
+                  <div className="flex gap-2">
+                    <Skeleton className="h-5 w-16 rounded" />
+                    <Skeleton className="h-5 w-20 rounded" />
+                    <Skeleton className="h-5 w-14 rounded" />
+                  </div>
+                </div>
+                <Skeleton className="w-10 h-10 rounded-xl" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -27,15 +56,38 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ user }) => {
       </div>
 
       {records.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center space-y-4">
-          <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto">
-            <Clock className="h-8 w-8 text-slate-300" />
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white border border-slate-200 rounded-3xl p-16 text-center space-y-8 relative overflow-hidden"
+        >
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-400 via-blue-500 to-emerald-400" />
+          
+          <div className="relative">
+            <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <ClipboardList className="h-12 w-12 text-emerald-500" />
+            </div>
+            
+            <div className="max-w-sm mx-auto space-y-2">
+              <h3 className="text-2xl font-bold text-slate-900">Your Health Journey Starts Here</h3>
+              <p className="text-slate-500">
+                You haven't performed any AI diagnostic checks yet. Start your first check-up to begin tracking your health history.
+              </p>
+            </div>
+
+            <div className="pt-8">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={onStartCheckup}
+                className="inline-flex items-center gap-2 px-8 py-4 bg-emerald-600 text-white rounded-2xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all"
+              >
+                Start New Check-up
+                <ArrowRight className="h-5 w-5" />
+              </motion.button>
+            </div>
           </div>
-          <div className="space-y-1">
-            <p className="font-bold text-slate-900">No history yet</p>
-            <p className="text-slate-500 text-sm">Your diagnostic reports will appear here.</p>
-          </div>
-        </div>
+        </motion.div>
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {records.map((record, idx) => {

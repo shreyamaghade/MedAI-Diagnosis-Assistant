@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import Database from "better-sqlite3";
@@ -9,8 +10,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const db = new Database("medai.db");
-
-// Initialize database
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,11 +61,21 @@ db.exec("UPDATE users SET email = LOWER(TRIM(email))");
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json());
 
   // API Routes
+  app.get("/api/health", (req, res) => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    res.json({ 
+      status: "ok", 
+      geminiConfigured: !!apiKey,
+      geminiKeyStart: apiKey ? apiKey.substring(0, 4) : "none",
+      nodeEnv: process.env.NODE_ENV
+    });
+  });
+
   app.post("/api/auth/register", async (req, res) => {
     const { email: rawEmail, name, password } = req.body;
     if (!rawEmail || !password) return res.status(400).json({ error: "Email and password are required" });

@@ -1,6 +1,13 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+function getAI() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === "undefined" || apiKey === "") {
+    console.error("GEMINI_API_KEY is missing or invalid on the frontend.");
+    throw new Error("Gemini API key is not configured.");
+  }
+  return new GoogleGenAI({ apiKey });
+}
 
 export const SUPPORTED_LANGUAGES = [
   { code: 'en', name: 'English', dir: 'ltr' },
@@ -21,6 +28,7 @@ export async function translateText(text: string, targetLang: string): Promise<s
   Text: ${text}`;
 
   try {
+    const ai = getAI();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,

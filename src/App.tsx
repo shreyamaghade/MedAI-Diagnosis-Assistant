@@ -44,6 +44,49 @@ import { cn } from './lib/utils';
 type AppStep = 'input' | 'chat' | 'result';
 type Tab = 'diagnosis' | 'history' | 'dashboard' | 'triage' | 'profile';
 
+const StepProgress = ({ step }: { step: AppStep }) => {
+  const steps: AppStep[] = ['input', 'chat', 'result'];
+  const currentIndex = steps.indexOf(step);
+  
+  return (
+    <div className="max-w-md mx-auto mb-12">
+      <div className="flex items-center justify-between relative">
+        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-100 -translate-y-1/2 z-0" />
+        <motion.div 
+          className="absolute top-1/2 left-0 h-0.5 bg-emerald-500 -translate-y-1/2 z-0"
+          initial={{ width: '0%' }}
+          animate={{ width: `${(currentIndex / (steps.length - 1)) * 100}%` }}
+          transition={{ duration: 0.5, ease: "circOut" }}
+        />
+        
+        {steps.map((s, i) => (
+          <div key={s} className="relative z-10 flex flex-col items-center gap-2">
+            <motion.div 
+              animate={{ 
+                scale: i <= currentIndex ? 1 : 0.8,
+                backgroundColor: i < currentIndex ? '#10b981' : i === currentIndex ? '#ffffff' : '#f1f5f9',
+                borderColor: i <= currentIndex ? '#10b981' : '#e2e8f0'
+              }}
+              className={cn(
+                "w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-colors",
+                i === currentIndex ? "text-emerald-600 shadow-lg shadow-emerald-100" : i < currentIndex ? "text-white" : "text-slate-400"
+              )}
+            >
+              {i < currentIndex ? "✓" : i + 1}
+            </motion.div>
+            <span className={cn(
+              "text-[10px] font-bold uppercase tracking-wider",
+              i <= currentIndex ? "text-emerald-600" : "text-slate-400"
+            )}>
+              {s === 'input' ? 'Symptoms' : s === 'chat' ? 'Analysis' : 'Results'}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('diagnosis');
@@ -120,9 +163,9 @@ export default function App() {
       setQuestions(followUpQuestions);
       setChatHistory([{ role: 'model', text: followUpQuestions[0] }]);
       setStep('chat');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError("Failed to start analysis. Please try again.");
+      setError(err.message || "Failed to start analysis. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -160,9 +203,9 @@ export default function App() {
             .then(res => setCurrentDiagnosisId(res.id))
             .catch(console.error);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error(err);
-        setError("Failed to generate final diagnosis. Please try again.");
+        setError(err.message || "Failed to generate final diagnosis. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -303,9 +346,10 @@ export default function App() {
           {activeTab === 'diagnosis' && (
             <motion.div
               key="diagnosis-tab"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
             >
               <AnimatePresence mode="wait">
                 {step === 'input' && (
@@ -316,6 +360,8 @@ export default function App() {
                     exit={{ opacity: 0, scale: 0.95 }}
                     className="space-y-12"
                   >
+                    <StepProgress step={step} />
+                    
                     {/* Hero Section */}
                     <div className="text-center space-y-4 max-w-2xl mx-auto">
                       <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
@@ -423,6 +469,8 @@ export default function App() {
                     exit={{ opacity: 0, x: -20 }}
                     className="max-w-2xl mx-auto space-y-8"
                   >
+                    <StepProgress step={step} />
+                    
                     <div className="text-center space-y-2">
                       <h2 className="text-2xl font-bold text-slate-900">{t.followUpQuestions}</h2>
                       <p className="text-slate-500">Please answer these questions to help refine your diagnosis.</p>
@@ -496,6 +544,8 @@ export default function App() {
                     animate={{ opacity: 1, x: 0 }}
                     className="space-y-8"
                   >
+                    <StepProgress step={step} />
+                    
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div className="space-y-1">
                         <h2 className="text-3xl font-black text-slate-900 tracking-tight">{t.diagnosticAnalysis}</h2>
@@ -598,20 +648,22 @@ export default function App() {
           {activeTab === 'history' && (
             <motion.div
               key="history-tab"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
             >
-              <HistoryView user={user} />
+              <HistoryView user={user} onStartCheckup={() => setActiveTab('diagnosis')} />
             </motion.div>
           )}
 
           {activeTab === 'dashboard' && (
             <motion.div
               key="dashboard-tab"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
             >
               <DashboardView user={user} />
             </motion.div>
@@ -620,9 +672,10 @@ export default function App() {
           {activeTab === 'triage' && (
             <motion.div
               key="triage-tab"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
             >
               <TriageDashboard />
             </motion.div>
@@ -631,9 +684,10 @@ export default function App() {
           {activeTab === 'profile' && user && (
             <motion.div
               key="profile-tab"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
             >
               <ProfileView user={user} onLogout={handleLogout} />
             </motion.div>
