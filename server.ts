@@ -3,61 +3,88 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import Database from "better-sqlite3";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import bcrypt from "bcryptjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const db = new Database("medai.db");
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT UNIQUE NOT NULL,
-    name TEXT,
-    password TEXT
-  );
+const DB_PATH = "medai.db";
 
-  CREATE TABLE IF NOT EXISTS diagnoses (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    date TEXT DEFAULT CURRENT_TIMESTAMP,
-    symptoms TEXT,
-    summary TEXT,
-    urgency TEXT,
-    results_json TEXT,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  );
+function initDb() {
+  let db: Database.Database;
+  try {
+    db = new Database(DB_PATH);
+    // Test the database
+    db.prepare("SELECT 1").get();
+  } catch (err: any) {
+    if (err.code === 'SQLITE_CORRUPT') {
+      console.error("Database is corrupted. Deleting and recreating...");
+      try {
+        fs.unlinkSync(DB_PATH);
+      } catch (unlinkErr) {
+        console.error("Failed to delete corrupted database:", unlinkErr);
+      }
+      db = new Database(DB_PATH);
+    } else {
+      throw err;
+    }
+  }
 
-  CREATE TABLE IF NOT EXISTS verification_feedback (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    diagnosis_id INTEGER NOT NULL,
-    condition_name TEXT NOT NULL,
-    doctor_id INTEGER NOT NULL,
-    feedback TEXT CHECK(feedback IN ('Agree', 'Correct')),
-    correction TEXT,
-    date TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (diagnosis_id) REFERENCES diagnoses(id),
-    FOREIGN KEY (doctor_id) REFERENCES users(id)
-  );
-`);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT UNIQUE NOT NULL,
+      name TEXT,
+      password TEXT
+    );
 
-// Migration: Add password column if it doesn't exist
-const userTableInfo = db.prepare("PRAGMA table_info(users)").all() as any[];
-const hasPassword = userTableInfo.some(column => column.name === 'password');
-if (!hasPassword) {
-  db.exec("ALTER TABLE users ADD COLUMN password TEXT");
+    CREATE TABLE IF NOT EXISTS diagnoses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      date TEXT DEFAULT CURRENT_TIMESTAMP,
+      symptoms TEXT,
+      summary TEXT,
+      urgency TEXT,
+      results_json TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS verification_feedback (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      diagnosis_id INTEGER NOT NULL,
+      condition_name TEXT NOT NULL,
+      doctor_id INTEGER NOT NULL,
+      feedback TEXT CHECK(feedback IN ('Agree', 'Correct')),
+      correction TEXT,
+      date TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (diagnosis_id) REFERENCES diagnoses(id),
+      FOREIGN KEY (doctor_id) REFERENCES users(id)
+    );
+  `);
+
+  // Migration: Add password column if it doesn't exist
+  const userTableInfo = db.prepare("PRAGMA table_info(users)").all() as any[];
+  const hasPassword = userTableInfo.some(column => column.name === 'password');
+  if (!hasPassword) {
+    db.exec("ALTER TABLE users ADD COLUMN password TEXT");
+  }
+
+  // Migration: Add urgency column if it doesn't exist
+  const diagnosesTableInfo = db.prepare("PRAGMA table_info(diagnoses)").all() as any[];
+  const hasUrgency = diagnosesTableInfo.some(column => column.name === 'urgency');
+  if (!hasUrgency) {
+    db.exec("ALTER TABLE diagnoses ADD COLUMN urgency TEXT DEFAULT 'Routine'");
+  }
+
+  // Migration: Lowercase all existing emails for consistency
+  db.exec("UPDATE users SET email = LOWER(TRIM(email))");
+  
+  return db;
 }
 
-// Migration: Add urgency column if it doesn't exist
-const diagnosesTableInfo = db.prepare("PRAGMA table_info(diagnoses)").all() as any[];
-const hasUrgency = diagnosesTableInfo.some(column => column.name === 'urgency');
-if (!hasUrgency) {
-  db.exec("ALTER TABLE diagnoses ADD COLUMN urgency TEXT DEFAULT 'Routine'");
-}
-
-// Migration: Lowercase all existing emails for consistency
-db.exec("UPDATE users SET email = LOWER(TRIM(email))");
+const db = initDb();
 
 async function startServer() {
   const app = express();
