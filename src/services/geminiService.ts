@@ -69,7 +69,7 @@ async function handleGeminiCall<T>(call: () => Promise<T>): Promise<T> {
     
     // Check for 429 Quota Exceeded
     if (err.message?.includes("429") || err.status === 429 || err.message?.includes("quota")) {
-      throw new Error("API Quota Exceeded: The AI is currently at its limit. Please wait a minute or check your Google AI Studio billing settings.");
+      throw new Error("API Quota Exceeded");
     }
     
     throw err;

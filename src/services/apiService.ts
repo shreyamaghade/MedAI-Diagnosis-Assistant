@@ -42,6 +42,18 @@ export async function register(email: string, password: string, name: string): P
   return response.json();
 }
 
+export async function guestLogin(): Promise<User> {
+  const response = await fetch("/api/auth/guest", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Guest access failed");
+  }
+  return response.json();
+}
+
 export async function getDiagnoses(userId: number): Promise<DiagnosisRecord[]> {
   const response = await fetch(`/api/diagnoses?userId=${userId}`);
   if (!response.ok) throw new Error("Failed to fetch diagnoses");

@@ -81,6 +81,20 @@ function initDb() {
   // Migration: Lowercase all existing emails for consistency
   db.exec("UPDATE users SET email = LOWER(TRIM(email))");
   
+  // Seed/Reset demo user
+  const demoEmail = "demo@example.com";
+  const hashedDemoPassword = bcrypt.hashSync("password123", 10);
+  const demoUser = db.prepare("SELECT * FROM users WHERE email = ?").get(demoEmail) as any;
+  
+  if (!demoUser) {
+    db.prepare("INSERT INTO users (email, name, password) VALUES (?, ?, ?)").run(demoEmail, "Demo User", hashedDemoPassword);
+    console.log("Demo user created: demo@example.com / password123");
+  } else {
+    // Always reset demo password to ensure it works
+    db.prepare("UPDATE users SET password = ? WHERE email = ?").run(hashedDemoPassword, demoEmail);
+    console.log("Demo user password reset to default");
+  }
+
   return db;
 }
 
@@ -101,6 +115,19 @@ async function startServer() {
       geminiKeyStart: apiKey ? apiKey.substring(0, 4) : "none",
       nodeEnv: process.env.NODE_ENV
     });
+  });
+
+  app.post("/api/auth/reset-demo", async (req, res) => {
+    const demoEmail = "demo@example.com";
+    const hashedDemoPassword = await bcrypt.hash("password123", 10);
+    const demoUser = db.prepare("SELECT * FROM users WHERE email = ?").get(demoEmail) as any;
+    
+    if (!demoUser) {
+      db.prepare("INSERT INTO users (email, name, password) VALUES (?, ?, ?)").run(demoEmail, "Demo User", hashedDemoPassword);
+    } else {
+      db.prepare("UPDATE users SET password = ? WHERE email = ?").run(hashedDemoPassword, demoEmail);
+    }
+    res.json({ success: true });
   });
 
   app.post("/api/auth/register", async (req, res) => {
@@ -133,17 +160,42 @@ async function startServer() {
 
     const email = rawEmail.trim().toLowerCase();
     const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email) as any;
-    if (!user) return res.status(401).json({ error: "Invalid email or password" });
+    
+    if (!user) {
+      console.log(`Login failed: User not found for email: ${email}`);
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
 
-    // If user exists but has no password (legacy user), allow login if no password provided (or handle migration)
-    // For this task, we assume all users should have a password now.
-    if (!user.password) return res.status(401).json({ error: "Account needs password setup. Please register again." });
+    if (!user.password) {
+      console.log(`Login failed: User ${email} has no password set`);
+      return res.status(401).json({ error: "Account needs password setup. Please register again." });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ error: "Invalid email or password" });
+    if (!isMatch) {
+      console.log(`Login failed: Password mismatch for user: ${email}`);
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
 
     const { password: _, ...userWithoutPassword } = user;
     res.json(userWithoutPassword);
+  });
+
+  app.post("/api/auth/guest", async (req, res) => {
+    const guestId = Math.floor(Math.random() * 1000000);
+    const email = `guest_${guestId}@medai.local`;
+    const name = `Guest User ${guestId}`;
+    const password = "guest_password_123";
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    try {
+      const result = db.prepare("INSERT INTO users (email, name, password) VALUES (?, ?, ?)").run(email, name, hashedPassword);
+      const user = { id: result.lastInsertRowid, email, name };
+      res.json(user);
+    } catch (err) {
+      console.error("Guest creation failed:", err);
+      res.status(500).json({ error: "Failed to create guest account" });
+    }
   });
 
   app.get("/api/diagnoses", (req, res) => {

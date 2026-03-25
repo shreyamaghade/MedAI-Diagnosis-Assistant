@@ -102,6 +102,7 @@ export default function App() {
   const [isDoctorView, setIsDoctorView] = useState(false);
   const [currentDiagnosisId, setCurrentDiagnosisId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retryAction, setRetryAction] = useState<(() => void) | null>(null);
 
   // Chat State
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -134,6 +135,7 @@ export default function App() {
     if (!result || isReading) return;
     
     setIsReading(true);
+    setRetryAction(() => handleReadReport);
     try {
       const audioData = await generateSpeech(result.summary);
       if (audioData) {
@@ -154,6 +156,7 @@ export default function App() {
     
     setLoading(true);
     setError(null);
+    setRetryAction(() => handleStartChat);
     try {
       const files: FileData[] = [];
       if (fileData) files.push(fileData);
@@ -174,26 +177,38 @@ export default function App() {
   const handleAnswerQuestion = async () => {
     if (!userAnswer.trim()) return;
 
-    const newHistory: ChatMessage[] = [
-      ...chatHistory,
-      { role: 'user', text: userAnswer }
-    ];
-    setChatHistory(newHistory);
-    setUserAnswer('');
+    const currentAnswer = userAnswer;
+    setRetryAction(() => handleAnswerQuestion);
 
     if (currentQuestionIndex < questions.length - 1) {
+      const newHistory: ChatMessage[] = [
+        ...chatHistory,
+        { role: 'user', text: currentAnswer }
+      ];
+      setChatHistory(newHistory);
+      setUserAnswer('');
       const nextIndex = currentQuestionIndex + 1;
       setCurrentQuestionIndex(nextIndex);
       setChatHistory([...newHistory, { role: 'model', text: questions[nextIndex] }]);
     } else {
       // All questions answered, get final diagnosis
       setLoading(true);
+      setError(null);
       try {
+        const newHistory: ChatMessage[] = [
+          ...chatHistory,
+          { role: 'user', text: currentAnswer }
+        ];
+        
         const files: FileData[] = [];
         if (fileData) files.push(fileData);
         if (visualFileData) files.push(visualFileData);
         
         const data = await getFinalDiagnosis(symptoms, newHistory, files.length > 0 ? files : undefined, vitals, healthData || undefined, language);
+        
+        // Success!
+        setChatHistory(newHistory);
+        setUserAnswer('');
         setResult(data);
         setStep('result');
 
@@ -217,6 +232,7 @@ export default function App() {
     setIsDeepDiveOpen(true);
     setDeepDiveLoading(true);
     setDeepDiveData(null);
+    setRetryAction(() => () => handleDeepDive(condition));
     try {
       const data = await getConditionDeepDive(condition);
       setDeepDiveData(data);
@@ -717,47 +733,55 @@ export default function App() {
         )}
 
         {error && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-8 p-6 bg-red-50 border border-red-200 rounded-2xl shadow-sm space-y-4"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center shrink-0">
-                <AlertTriangle className="h-5 w-5 text-red-600" />
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              className="max-w-md w-full bg-white rounded-3xl shadow-2xl border border-red-100 overflow-hidden"
+            >
+              <div className="p-8 space-y-6">
+                <div className="flex flex-col items-center text-center space-y-4">
+                  <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center">
+                    <AlertTriangle className="h-8 w-8 text-red-600" />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-2xl font-black text-slate-900">Analysis Interrupted</h3>
+                    <p className="text-slate-500 font-medium leading-relaxed">
+                      {error === "API Quota Exceeded" 
+                        ? "The AI service is currently experiencing high demand. Please wait a moment before trying again."
+                        : error}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 pt-4">
+                  <motion.button 
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      setError(null);
+                      if (retryAction) retryAction();
+                    }}
+                    className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-bold text-lg hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 flex items-center justify-center gap-2"
+                  >
+                    <RefreshCcw className="h-5 w-5" />
+                    Try Again
+                  </motion.button>
+                  <button 
+                    onClick={reset}
+                    className="w-full py-4 bg-slate-50 text-slate-600 border border-slate-200 rounded-2xl font-bold hover:bg-slate-100 transition-all"
+                  >
+                    Start Over
+                  </button>
+                </div>
               </div>
-              <div className="space-y-1 flex-1">
-                <h3 className="font-bold text-red-900">Analysis Interrupted</h3>
-                <p className="text-sm text-red-700/80 leading-relaxed font-medium">
-                  {error}
-                </p>
+              
+              <div className="bg-slate-50 px-8 py-4 border-t border-slate-100 flex items-center justify-center gap-2">
+                <ShieldAlert className="h-3.5 w-3.5 text-slate-400" />
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">System Status: Recovery Mode</span>
               </div>
-              <button 
-                onClick={() => setError(null)}
-                className="text-red-400 hover:text-red-600 transition-colors"
-              >
-                <RefreshCcw className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="flex items-center gap-3 pt-2">
-              <button 
-                onClick={() => {
-                  setError(null);
-                  if (step === 'input') handleStartChat();
-                  else if (step === 'chat') handleAnswerQuestion();
-                }}
-                className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-bold hover:bg-red-700 transition-all shadow-md shadow-red-100"
-              >
-                Try Again
-              </button>
-              <button 
-                onClick={reset}
-                className="px-4 py-2 bg-white text-slate-600 border border-slate-200 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all"
-              >
-                Start Over
-              </button>
-            </div>
-          </motion.div>
+            </motion.div>
+          </div>
         )}
       </main>
 

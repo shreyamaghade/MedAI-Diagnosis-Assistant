@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, User as UserIcon, ArrowRight, HeartPulse, Lock, Eye, EyeOff } from 'lucide-react';
-import { login, register, User } from '../services/apiService';
+import { login, register, guestLogin, User } from '../services/apiService';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface AuthViewProps {
@@ -19,17 +19,55 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
-    
+    performAuth(email, password, name);
+  };
+
+  const performAuth = async (emailToUse: string, passwordToUse: string, nameToUse?: string) => {
     setLoading(true);
     setError(null);
     try {
       const user = isRegistering 
-        ? await register(email, password, name)
-        : await login(email, password);
+        ? await register(emailToUse, passwordToUse, nameToUse || '')
+        : await login(emailToUse, passwordToUse);
       onLogin(user);
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Authentication failed. Please check your credentials.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDemoLogin = () => {
+    setIsRegistering(false);
+    setEmail('demo@example.com');
+    setPassword('password123');
+    performAuth('demo@example.com', 'password123');
+  };
+
+  const handleGuestAccess = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const user = await guestLogin();
+      onLogin(user);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "Guest access failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetDemo = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/auth/reset-demo", { method: "POST" });
+      if (!response.ok) throw new Error("Failed to reset demo user");
+      setError("Demo user has been reset. You can now use Demo Login.");
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -141,14 +179,51 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
             </motion.button>
           </form>
 
-          <div className="text-center">
+          <div className="text-center space-y-4">
             <motion.button 
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setIsRegistering(!isRegistering)}
-              className="text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-colors"
+              className="text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-colors block w-full"
             >
               {isRegistering ? "Already have an account? Sign In" : "New to MedAI? Create an account"}
+            </motion.button>
+
+            <div className="relative py-2">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-100"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-2 text-slate-400 font-bold tracking-widest">Or try demo</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleDemoLogin}
+                className="py-3 px-4 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all shadow-md flex items-center justify-center gap-2"
+              >
+                Demo Login
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleGuestAccess}
+                className="py-3 px-4 bg-white text-emerald-600 border border-emerald-200 rounded-xl text-xs font-bold hover:bg-emerald-50 transition-all shadow-sm flex items-center justify-center gap-2"
+              >
+                Guest Access
+              </motion.button>
+            </div>
+            
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleResetDemo}
+              className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors block w-full"
+            >
+              Trouble logging in? Reset Demo Account
             </motion.button>
           </div>
         </div>
