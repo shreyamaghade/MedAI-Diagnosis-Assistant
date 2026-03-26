@@ -16,8 +16,10 @@ import {
   User as UserIcon,
   Clock,
   AlertTriangle,
-  Volume2
+  Volume2,
+  Bell
 } from 'lucide-react';
+import { io } from 'socket.io-client';
 import { SymptomSelector } from './components/SymptomSelector';
 import { FileUpload } from './components/FileUpload';
 import { VisualSymptomUpload } from './components/VisualSymptomUpload';
@@ -32,8 +34,12 @@ import { TriageDashboard } from './components/TriageDashboard';
 import { SpecialistFinder } from './components/SpecialistFinder';
 import { TelehealthSession } from './components/TelehealthSession';
 import { ProfileView } from './components/ProfileView';
+import { WelcomeModal } from './components/WelcomeModal';
+import { NotificationCenter, Notification } from './components/NotificationCenter';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { Toaster, toast } from 'sonner';
 import { getFollowUpQuestions, getFinalDiagnosis, getConditionDeepDive, generateSpeech, findSpecialists, DiagnosisResponse, FileData, Vitals, ChatMessage, ConditionDeepDive } from './services/geminiService';
-import { login, saveDiagnosis, User } from './services/apiService';
+import { login, saveDiagnosis, User, uploadFiles, getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from './services/apiService';
 import { HealthData } from './services/healthService';
 import { generateFHIRDiagnosticReport, downloadJSON } from './lib/fhirExport';
 import { SUPPORTED_LANGUAGES, UI_STRINGS, LanguageCode } from './services/translationService';
@@ -89,12 +95,15 @@ const StepProgress = ({ step }: { step: AppStep }) => {
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
+  const [showWelcome, setShowWelcome] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('diagnosis');
   const [language, setLanguage] = useState<LanguageCode>('en');
   const [step, setStep] = useState<AppStep>('input');
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [fileData, setFileData] = useState<FileData | null>(null);
   const [visualFileData, setVisualFileData] = useState<FileData | null>(null);
+  const [actualFile, setActualFile] = useState<File | null>(null);
+  const [actualVisualFile, setActualVisualFile] = useState<File | null>(null);
   const [vitals, setVitals] = useState<Vitals>({});
   const [healthData, setHealthData] = useState<HealthData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -103,6 +112,19 @@ export default function App() {
   const [currentDiagnosisId, setCurrentDiagnosisId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retryAction, setRetryAction] = useState<(() => void) | null>(null);
+
+  // Global error handler for API calls
+  const handleError = (err: any, customMessage?: string) => {
+    const message = err.message || customMessage || "An unexpected error occurred.";
+    setError(message);
+    toast.error(message, {
+      description: "Please try again or contact support if the issue persists.",
+      action: retryAction ? {
+        label: "Retry",
+        onClick: () => retryAction()
+      } : undefined
+    });
+  };
 
   // Chat State
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -120,6 +142,51 @@ export default function App() {
   const [targetSpecialist, setTargetSpecialist] = useState('');
   const [isTelehealthOpen, setIsTelehealthOpen] = useState(false);
   const [telehealthCondition, setTelehealthCondition] = useState('');
+
+  // Notification State
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+
+  React.useEffect(() => {
+    if (user && user.token) {
+      // Fetch initial notifications
+      getNotifications(user.token)
+        .then(setNotifications)
+        .catch(console.error);
+
+      // Setup socket
+      const socket = io();
+      socket.emit('join', user.id);
+
+      socket.on('notification', (notification: Notification) => {
+        setNotifications(prev => [notification, ...prev]);
+      });
+
+      return () => {
+        socket.disconnect();
+      };
+    }
+  }, [user]);
+
+  const handleMarkAsRead = async (id: number) => {
+    if (!user?.token) return;
+    try {
+      await markNotificationAsRead(user.token, id);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: 1 } : n));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    if (!user?.token) return;
+    try {
+      await markAllNotificationsAsRead(user.token);
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: 1 })));
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const handleFindSpecialist = (specialistType: string) => {
     setTargetSpecialist(specialistType);
@@ -147,6 +214,7 @@ export default function App() {
       }
     } catch (err) {
       console.error("TTS failed", err);
+      handleError(err, "Failed to generate speech for the report.");
       setIsReading(false);
     }
   };
@@ -168,7 +236,7 @@ export default function App() {
       setStep('chat');
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Failed to start analysis. Please try again.");
+      handleError(err, "Failed to start analysis. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -214,13 +282,22 @@ export default function App() {
 
         // Save to history if user is logged in
         if (user) {
-          saveDiagnosis(user.id, symptoms, data.summary, data.possibleConditions, data.overallUrgency)
+          let uploadedFiles: any[] = [];
+          if (actualFile || actualVisualFile) {
+            const filesToUpload = [];
+            if (actualFile) filesToUpload.push(actualFile);
+            if (actualVisualFile) filesToUpload.push(actualVisualFile);
+            const uploadRes = await uploadFiles(user.token!, filesToUpload);
+            uploadedFiles = uploadRes.files;
+          }
+
+          saveDiagnosis(user.token!, symptoms, data.summary, data.possibleConditions, data.overallUrgency, uploadedFiles)
             .then(res => setCurrentDiagnosisId(res.id))
             .catch(console.error);
         }
       } catch (err: any) {
         console.error(err);
-        setError(err.message || "Failed to generate final diagnosis. Please try again.");
+        handleError(err, "Failed to generate final diagnosis. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -238,7 +315,7 @@ export default function App() {
       setDeepDiveData(data);
     } catch (err) {
       console.error(err);
-      setError("Failed to fetch condition details.");
+      handleError(err, "Failed to fetch condition details.");
     } finally {
       setDeepDiveLoading(false);
     }
@@ -255,6 +332,8 @@ export default function App() {
     setSymptoms([]);
     setFileData(null);
     setVisualFileData(null);
+    setActualFile(null);
+    setActualVisualFile(null);
     setVitals({});
     setHealthData(null);
     setResult(null);
@@ -279,15 +358,23 @@ export default function App() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-50 font-sans text-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
-        <AuthView onLogin={setUser} />
-      </div>
+      <ErrorBoundary>
+        <div className="min-h-screen bg-slate-50 font-sans text-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
+          <AuthView onLogin={(u) => {
+            setUser(u);
+            setShowWelcome(true);
+          }} />
+          <Toaster position="top-right" richColors />
+        </div>
+      </ErrorBoundary>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
-      {/* Navigation */}
+    <ErrorBoundary>
+      <div className="min-h-screen bg-slate-50 font-sans text-slate-900" dir={isRtl ? 'rtl' : 'ltr'}>
+        <Toaster position="top-right" richColors />
+        {/* Navigation */}
       <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/50 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
           <motion.div 
@@ -333,8 +420,32 @@ export default function App() {
             ))}
           </nav>
 
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                  className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center border border-slate-200 relative group"
+                >
+                  <Bell className={cn("h-5 w-5 transition-colors", notifications.some(n => !n.is_read) ? "text-emerald-600" : "text-slate-400 group-hover:text-slate-600")} />
+                  {notifications.some(n => !n.is_read) && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full flex items-center justify-center text-[8px] font-black text-white">
+                      {notifications.filter(n => !n.is_read).length}
+                    </span>
+                  )}
+                </motion.button>
+                
+                <NotificationCenter 
+                  notifications={notifications}
+                  onMarkAsRead={handleMarkAsRead}
+                  onMarkAllAsRead={handleMarkAllAsRead}
+                  isOpen={isNotificationsOpen}
+                  onClose={() => setIsNotificationsOpen(false)}
+                />
+              </div>
+
+              <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
               <Globe className="h-4 w-4 text-slate-400" />
               <select 
                 value={language}
@@ -435,8 +546,14 @@ export default function App() {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
-                          <FileUpload onFileSelect={(data) => setFileData(data ? { inlineData: data } : null)} />
-                          <VisualSymptomUpload onFileSelect={(data) => setVisualFileData(data ? { inlineData: data } : null)} />
+                          <FileUpload onFileSelect={(data, file) => {
+                            setFileData(data ? { inlineData: data } : null);
+                            setActualFile(file);
+                          }} />
+                          <VisualSymptomUpload onFileSelect={(data, file) => {
+                            setVisualFileData(data ? { inlineData: data } : null);
+                            setActualVisualFile(file);
+                          }} />
                         </div>
 
                         <div className="pt-4">
@@ -644,6 +761,7 @@ export default function App() {
                           onTelehealth={handleTelehealth}
                           diagnosisId={currentDiagnosisId}
                           doctorId={user.id}
+                          doctorToken={user.token}
                         />
                       ))}
                     </div>
@@ -693,7 +811,7 @@ export default function App() {
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3, ease: "easeOut" }}
             >
-              <TriageDashboard />
+              <TriageDashboard user={user} />
             </motion.div>
           )}
 
@@ -799,6 +917,13 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      <WelcomeModal 
+        isOpen={showWelcome} 
+        onClose={() => setShowWelcome(false)} 
+        userName={user.name} 
+      />
     </div>
+    </ErrorBoundary>
   );
 }

@@ -13,14 +13,15 @@ interface DiagnosisCardProps {
   onTelehealth: (condition: string) => void;
   diagnosisId?: number | null;
   doctorId?: number;
+  doctorToken?: string;
 }
 
-export const DiagnosisCard: React.FC<DiagnosisCardProps> = ({ result, isDoctorView, onDeepDive, onFindSpecialist, onTelehealth, diagnosisId, doctorId }) => {
+export const DiagnosisCard: React.FC<DiagnosisCardProps> = ({ result, isDoctorView, onDeepDive, onFindSpecialist, onTelehealth, diagnosisId, doctorId, doctorToken }) => {
   const [verified, setVerified] = useState<'Agree' | 'Correct' | null>(null);
   const [confidence, setConfidence] = useState<{ total: number; score: number } | null>(null);
 
   useEffect(() => {
-    getConfidenceStats().then(stats => {
+    getConfidenceStats(doctorToken).then(stats => {
       const stat = stats.find(s => s.condition_name === result.condition);
       if (stat && stat.total_reviews > 0) {
         setConfidence({
@@ -32,9 +33,9 @@ export const DiagnosisCard: React.FC<DiagnosisCardProps> = ({ result, isDoctorVi
   }, [result.condition, verified]);
 
   const handleVerify = async (feedback: 'Agree' | 'Correct') => {
-    if (!diagnosisId || !doctorId) return;
+    if (!diagnosisId || !doctorToken) return;
     try {
-      await verifyDiagnosis(diagnosisId, result.condition, doctorId, feedback);
+      await verifyDiagnosis(doctorToken, diagnosisId, result.condition, feedback);
       setVerified(feedback);
     } catch (err) {
       console.error(err);

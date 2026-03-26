@@ -1,27 +1,39 @@
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, Clock, User, ChevronRight, Search, Filter } from 'lucide-react';
-import { getTriageDashboard, DiagnosisRecord } from '../services/apiService';
+import { AlertTriangle, Clock, User, ChevronRight, Search, Filter, FileText } from 'lucide-react';
+import { getTriageDashboard, DiagnosisRecord, User as UserType } from '../services/apiService';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { Skeleton } from './Skeleton';
 
-export const TriageDashboard: React.FC = () => {
+interface TriageDashboardProps {
+  user: UserType;
+}
+
+export const TriageDashboard: React.FC<TriageDashboardProps> = ({ user }) => {
   const [records, setRecords] = useState<DiagnosisRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [patientName, setPatientName] = useState('');
+  const [urgency, setUrgency] = useState('');
+  const [condition, setCondition] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
-  useEffect(() => {
-    getTriageDashboard()
+  const fetchRecords = () => {
+    if (!user.token) return;
+    setLoading(true);
+    getTriageDashboard(user.token, { patientName, urgency, condition, startDate, endDate })
       .then(setRecords)
       .finally(() => setLoading(false));
-  }, []);
+  };
 
-  const filteredRecords = records.filter(r => 
-    r.patient_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    r.summary.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchRecords();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [user.token, patientName, urgency, condition, startDate, endDate]);
 
-  if (loading) {
+  if (loading && records.length === 0) {
     return (
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -61,15 +73,55 @@ export const TriageDashboard: React.FC = () => {
           <h2 className="text-2xl font-bold text-slate-900">Hospital Triage Dashboard</h2>
           <p className="text-sm text-slate-500 font-medium">Prioritized patient requests based on AI urgency detection.</p>
         </div>
-        
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="relative">
+            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Patient Name..."
+              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+              value={patientName}
+              onChange={(e) => setPatientName(e.target.value)}
+            />
+          </div>
+
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Condition/Summary..."
+              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+              value={condition}
+              onChange={(e) => setCondition(e.target.value)}
+            />
+          </div>
+          
+          <select
+            className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+            value={urgency}
+            onChange={(e) => setUrgency(e.target.value)}
+          >
+            <option value="">All Urgencies</option>
+            <option value="Routine">Routine</option>
+            <option value="Urgent">Urgent</option>
+            <option value="Emergency">Emergency</option>
+          </select>
+
           <input
-            type="text"
-            placeholder="Search patients or symptoms..."
-            className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all w-full md:w-64"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            type="date"
+            className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+
+          <input
+            type="date"
+            className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
           />
         </div>
       </div>
@@ -87,7 +139,7 @@ export const TriageDashboard: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {filteredRecords.map((record, idx) => {
+              {records.map((record, idx) => {
                 const isEmergency = record.urgency === 'Emergency';
                 const isUrgent = record.urgency === 'Urgent';
                 
@@ -127,7 +179,25 @@ export const TriageDashboard: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm text-slate-600 line-clamp-1 max-w-xs">{record.summary}</p>
+                      <div className="space-y-1">
+                        <p className="text-sm text-slate-600 line-clamp-1 max-w-xs">{record.summary}</p>
+                        {record.files && JSON.parse(record.files).length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {JSON.parse(record.files).map((file: any, i: number) => (
+                              <a 
+                                key={i}
+                                href={file.path}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[9px] font-bold border border-blue-100 hover:bg-blue-100 transition-colors"
+                              >
+                                <FileText className="h-2.5 w-2.5" />
+                                {file.name}
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
@@ -151,7 +221,7 @@ export const TriageDashboard: React.FC = () => {
           </table>
         </div>
         
-        {filteredRecords.length === 0 && (
+        {records.length === 0 && (
           <div className="py-20 text-center space-y-4">
             <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto">
               <Filter className="h-8 w-8 text-slate-200" />

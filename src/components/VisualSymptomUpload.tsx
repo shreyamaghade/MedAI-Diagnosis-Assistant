@@ -3,7 +3,7 @@ import { Camera, X, Upload, Image as ImageIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface VisualSymptomUploadProps {
-  onFileSelect: (file: { data: string; mimeType: string } | null) => void;
+  onFileSelect: (file: { data: string; mimeType: string } | null, actualFile: File | null) => void;
 }
 
 export const VisualSymptomUpload: React.FC<VisualSymptomUploadProps> = ({ onFileSelect }) => {
@@ -30,7 +30,7 @@ export const VisualSymptomUpload: React.FC<VisualSymptomUploadProps> = ({ onFile
         onFileSelect({
           data: base64String,
           mimeType: file.type
-        });
+        }, file);
       };
       reader.readAsDataURL(file);
     }
@@ -38,7 +38,7 @@ export const VisualSymptomUpload: React.FC<VisualSymptomUploadProps> = ({ onFile
 
   const removeFile = () => {
     setPreviewUrl(null);
-    onFileSelect(null);
+    onFileSelect(null, null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }

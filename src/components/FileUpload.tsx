@@ -3,7 +3,7 @@ import { FileText, X, Upload, FileUp } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface FileUploadProps {
-  onFileSelect: (file: { data: string; mimeType: string } | null) => void;
+  onFileSelect: (file: { data: string; mimeType: string } | null, actualFile: File | null) => void;
 }
 
 export const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
@@ -25,7 +25,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
         onFileSelect({
           data: base64String,
           mimeType: file.type
-        });
+        }, file);
       };
       reader.readAsDataURL(file);
     }
@@ -33,7 +33,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
 
   const removeFile = () => {
     setSelectedFile(null);
-    onFileSelect(null);
+    onFileSelect(null, null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }

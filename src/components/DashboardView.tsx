@@ -29,10 +29,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user }) => {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!user.token) return;
       try {
         const [diagnosisRecords, stats] = await Promise.all([
-          getDiagnoses(user.id),
-          getConfidenceStats()
+          getDiagnoses(user.token),
+          getConfidenceStats(user.token)
         ]);
         setRecords(diagnosisRecords);
         setConfidenceStats(stats);
@@ -43,7 +44,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ user }) => {
       }
     };
     fetchData();
-  }, [user.id]);
+  }, [user.token]);
 
   if (loading) {
     return (
